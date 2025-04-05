@@ -1,19 +1,38 @@
-from telegram.ext import ApplicationBuilder, MessageHandler, filters
-from telegram import Update
-from telegram.ext import ContextTypes
 import os
+from dotenv import load_dotenv
+from openai import OpenAI
+from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+from telegram import Update
 
-# Читаем токен
-with open("token.txt") as f:
-    TOKEN = f.read().strip()
+# Загружаем .env
+load_dotenv()
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-async def reply_hello(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привет!")
+# Инициализируем OpenAI клиент
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-app = ApplicationBuilder().token(TOKEN).build()
+# Обработчик Telegram-сообщений
+async def chat_with_openai(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_message = update.message.text
 
-# Регистрируем обработчик всех сообщений
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_hello))
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": user_message}]
+        )
+        reply = response.choices[0].message.content.strip()
 
-print("Бот запущен...")
+    except Exception as e:
+        reply = f"Ошибка при обращении к OpenAI: {e}"
+
+    await update.message.reply_text(reply)
+
+# Настройка Telegram бота
+app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat_with_openai))
+
+print("Бот запущен с OpenAI 1.0+")
 app.run_polling()
+
+
